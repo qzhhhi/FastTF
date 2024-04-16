@@ -6,7 +6,7 @@
 
 #include <eigen3/Eigen/Dense>
 
-#include "joint.hpp"
+#include "fast_tf/impl/joint.hpp"
 
 namespace fast_tf {
 

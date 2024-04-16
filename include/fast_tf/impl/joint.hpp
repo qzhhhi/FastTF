@@ -4,7 +4,7 @@
 
 #include <eigen3/Eigen/Dense>
 
-#include "link.hpp"
+#include "fast_tf/impl/link.hpp"
 
 namespace fast_tf {
 

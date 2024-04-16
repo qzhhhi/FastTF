@@ -57,7 +57,7 @@ struct Link {
             : quaternion(quaternion) {}
         explicit Rotation(const Eigen::AngleAxisd& angle_axis)
             : quaternion(angle_axis) {}
-        Rotation(const Eigen::Matrix3d& matrix)
+        explicit Rotation(const Eigen::Matrix3d& matrix)
             : quaternion(matrix) {}
         Rotation(const double& w, const double& x, const double& y, const double& z)
             : quaternion(w, x, y, z) {}

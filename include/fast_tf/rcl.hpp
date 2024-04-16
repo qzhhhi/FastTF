@@ -3,7 +3,8 @@
 #include <rclcpp/node.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 
-#include "joint.hpp"
+#include "fast_tf/impl/joint.hpp"
+#include "fast_tf/impl/joint_collection.hpp"
 
 namespace fast_tf {
 
@@ -85,6 +86,11 @@ inline void broadcast(const JointCollectionT& collection) {
     auto& transform              = collection.template get_transform<From, To>();
     auto [translation, rotation] = internal::extract_translation_rotation(transform);
     Node::get_instance().tf_broadcast(From::name, To::name, translation, rotation);
+}
+
+template <typename... ChildLinkTs>
+inline void broadcast_all(const JointCollection<ChildLinkTs...>& collection) {
+    (broadcast<typename Joint<ChildLinkTs>::Parent, ChildLinkTs>(collection), ...);
 }
 
 } // namespace rcl
