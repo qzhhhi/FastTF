@@ -171,4 +171,21 @@ inline typename To::Rotation
     }
 }
 
+template <internal::is_link From, internal::is_link To, typename... JointCollectionTs>
+auto lookup_transform(const JointCollectionTs&... collections) {
+    if constexpr (std::is_same_v<From, To>) {
+        return;
+    } else {
+        using Lca = internal::get_lca_v<From, To>;
+        if constexpr (std::is_same_v<Lca, From>) {
+            return internal::accumulate_transform<Lca, To>(collections...);
+        } else if constexpr (std::is_same_v<Lca, To>) {
+            return internal::accumulate_transform<Lca, From>(collections...).inverse();
+        } else {
+            return internal::accumulate_transform<Lca, From>(collections...).inverse()
+                 * internal::accumulate_transform<Lca, To>(collections...);
+        }
+    }
+}
+
 } // namespace fast_tf
