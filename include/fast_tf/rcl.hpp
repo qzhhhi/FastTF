@@ -1,10 +1,10 @@
 #pragma once
 
 #include <rclcpp/node.hpp>
+#include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/transform_broadcaster.h>
 
 #include "fast_tf/impl/joint.hpp"
-#include "fast_tf/impl/joint_collection.hpp"
 
 namespace fast_tf {
 
@@ -70,27 +70,34 @@ private:
         : rclcpp::Node("fast_tf", rclcpp::NodeOptions().use_intra_process_comms(true))
         , tf_broadcaster_(this) {}
 
+    template <typename From, typename To>
+    requires(internal::is_link<From> && internal::is_link<To>) class BroadcastCache {
+    public:
+    private:
+    };
+
     tf2_ros::TransformBroadcaster tf_broadcaster_;
 };
 
-template <internal::is_link From, internal::is_link To>
-requires(internal::has_static_joint<From, To>) inline void broadcast() {
-    auto& transform              = Joint<To>::transform;
+template <internal::is_link From, internal::is_link To, typename... JointCollectionTs>
+requires(internal::has_joint<From, To> && requires(const JointCollectionTs&... collections) {
+    get_transform<From, To>(collections...);
+}) inline void broadcast(const JointCollectionTs&... collections) {
+    auto transform               = get_transform<From, To>(collections...);
     auto [translation, rotation] = internal::extract_translation_rotation(transform);
     Node::get_instance().tf_broadcast(From::name, To::name, translation, rotation);
 }
 
-template <internal::is_link From, internal::is_link To, typename JointCollectionT>
-requires(internal::has_joint<From, To> && JointCollectionT::template contains_joint_v<To>)
-inline void broadcast(const JointCollectionT& collection) {
-    auto& transform              = collection.template get_transform<From, To>();
-    auto [translation, rotation] = internal::extract_translation_rotation(transform);
-    Node::get_instance().tf_broadcast(From::name, To::name, translation, rotation);
+template <typename JointCollectionT>
+inline void broadcast_all(const JointCollectionT& collection) {
+    collection.for_each(
+        [&collection]<typename From, typename To>() { broadcast<From, To>(collection); });
 }
 
-template <typename... ChildLinkTs>
-inline void broadcast_all(const JointCollection<ChildLinkTs...>& collection) {
-    (broadcast<typename Joint<ChildLinkTs>::Parent, ChildLinkTs>(collection), ...);
+template <typename JointCollectionT>
+inline void broadcast_all_modified(const JointCollectionT& collection) {
+    collection.for_each_modified(
+        [&collection]<typename From, typename To>() { broadcast<From, To>(collection); });
 }
 
 } // namespace rcl

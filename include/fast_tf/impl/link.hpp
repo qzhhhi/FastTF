@@ -3,6 +3,7 @@
 #include <type_traits>
 
 #include <eigen3/Eigen/Dense>
+#include <utility>
 
 namespace fast_tf {
 
@@ -15,8 +16,8 @@ struct Link {
 
         Position()
             : position(Eigen::Vector3d::Identity()) {}
-        explicit Position(const Eigen::Vector3d& position)
-            : position(position) {}
+        explicit Position(Eigen::Vector3d position)
+            : position(std::move(position)) {}
         Position(const double& x, const double& y, const double& z)
             : position{x, y, z} {}
 
@@ -34,8 +35,8 @@ struct Link {
 
         DirectionVector()
             : vector(Eigen::Vector3d::UnitX()) {}
-        explicit DirectionVector(const Eigen::Vector3d& vector)
-            : vector(vector) {}
+        explicit DirectionVector(Eigen::Vector3d vector)
+            : vector(std::move(vector)) {}
         DirectionVector(const double& x, const double& y, const double& z)
             : vector(x, y, z) {}
 
@@ -53,8 +54,8 @@ struct Link {
 
         Rotation()
             : quaternion(Eigen::Quaterniond::Identity()) {}
-        explicit Rotation(const Eigen::Quaterniond& quaternion)
-            : quaternion(quaternion) {}
+        explicit Rotation(Eigen::Quaterniond quaternion)
+            : quaternion(std::move(quaternion)) {}
         explicit Rotation(const Eigen::AngleAxisd& angle_axis)
             : quaternion(angle_axis) {}
         explicit Rotation(const Eigen::Matrix3d& matrix)

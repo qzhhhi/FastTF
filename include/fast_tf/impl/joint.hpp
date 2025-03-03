@@ -15,6 +15,14 @@ struct Joint {
     using Parent = Null;
 };
 
+struct ModificationTrackable {
+    bool get_modified() const { return modified_; }
+    void set_modified(bool value) { modified_ = value; }
+
+private:
+    bool modified_ = true;
+};
+
 namespace internal {
 
 template <class T>
@@ -22,10 +30,22 @@ concept is_non_root_link = is_link<T> && !std::is_same_v<typename Joint<T>::Pare
 
 template <typename ParentT, typename ChildT>
 concept has_joint = std::is_same_v<ParentT, typename Joint<ChildT>::Parent>
-                 && requires(Joint<ChildT> joint) { joint.transform; };
+                 && (requires(Joint<ChildT> joint) { joint.transform; } ||
+                     requires(Joint<ChildT> joint) { joint.get_transform(); });
+
+template <typename ParentT, typename ChildT, typename... ArgTs>
+concept has_setter_joint =
+    has_joint<ParentT, ChildT>
+    && requires(Joint<ChildT> joint, ArgTs... arg) { joint.set_transform(arg...); };
+
+template <typename ParentT, typename ChildT, typename... ArgTs>
+concept has_stateful_joint =
+    has_joint<ParentT, ChildT>
+    && requires(Joint<ChildT> joint, ArgTs... arg) { joint.set_state(arg...); };
 
 template <typename ParentT, typename ChildT>
-concept has_static_joint = has_joint<ParentT, ChildT> && (fast_tf::Joint<ChildT>::transform, true);
+concept has_getter_joint =
+    has_joint<ParentT, ChildT> && requires(const Joint<ChildT>& joint) { joint.get_transform(); };
 
 template <typename T>
 concept is_transform = std::is_same_v<std::remove_cvref_t<T>, Eigen::Isometry3d>;
@@ -51,14 +71,9 @@ concept has_translation_joint = has_joint<ParentT, ChildT> && requires(Joint<Chi
 
 } // namespace internal
 
-template <internal::is_link From, internal::is_link To>
-requires(internal::has_static_joint<From, To>) inline auto& get_transform() {
-    return Joint<To>::transform;
-}
-
 template <internal::is_link From, internal::is_link To, typename JointCollectionT>
 requires(internal::has_joint<From, To> && JointCollectionT::template contains_joint_v<To>)
-inline auto& get_transform(JointCollectionT& collection, auto&...) {
+inline auto get_transform(const JointCollectionT& collection, const auto&...) {
     return collection.template get_transform<From, To>();
 }
 
@@ -66,7 +81,7 @@ template <
     internal::is_link From, internal::is_link To, typename JointCollectionT,
     typename... JointCollectionTs>
 requires(internal::has_joint<From, To> && !JointCollectionT::template contains_joint_v<To>)
-inline auto& get_transform(JointCollectionT&, JointCollectionTs&... collections) {
+inline auto get_transform(const JointCollectionT&, const JointCollectionTs&... collections) {
     return get_transform<From, To>(collections...);
 }
 
