@@ -3,6 +3,7 @@
 #include <rclcpp/node.hpp>
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/transform_broadcaster.h>
+#include <vector>
 
 #include "fast_tf/impl/joint.hpp"
 
@@ -44,8 +45,9 @@ public:
         return instance;
     }
 
-    void tf_broadcast(
-        const char* header, const char* child, const Eigen::Translation3d& translation,
+    void build_transfrom_stamped(
+        std::vector<geometry_msgs::msg::TransformStamped>& transforms, const char* header,
+        const char* child, const Eigen::Translation3d& translation,
         const Eigen::Quaterniond& rotation) {
 
         geometry_msgs::msg::TransformStamped t;
@@ -61,7 +63,10 @@ public:
         t.transform.rotation.x = rotation.x();
         t.transform.rotation.y = rotation.y();
         t.transform.rotation.z = rotation.z();
+        transforms.emplace_back(t);
+    }
 
+    void tf_broadcast(const std::vector<geometry_msgs::msg::TransformStamped>& t) {
         tf_broadcaster_.sendTransform(t);
     }
 
@@ -80,24 +85,35 @@ private:
 };
 
 template <internal::is_link From, internal::is_link To, typename... JointCollectionTs>
-requires(internal::has_joint<From, To> && requires(const JointCollectionTs&... collections) {
-    get_transform<From, To>(collections...);
-}) inline void broadcast(const JointCollectionTs&... collections) {
+requires(
+    internal::has_joint<From, To>
+    && requires(
+        const JointCollectionTs&... collections) { get_transform<From, To>(collections...); })
+inline void broadcast(
+    std::vector<geometry_msgs::msg::TransformStamped>& transforms,
+    const JointCollectionTs&... collections) {
     auto transform               = get_transform<From, To>(collections...);
     auto [translation, rotation] = internal::extract_translation_rotation(transform);
-    Node::get_instance().tf_broadcast(From::name, To::name, translation, rotation);
+    Node::get_instance().build_transfrom_stamped(
+        transforms, From::name, To::name, translation, rotation);
 }
 
 template <typename JointCollectionT>
 inline void broadcast_all(const JointCollectionT& collection) {
-    collection.for_each(
-        [&collection]<typename From, typename To>() { broadcast<From, To>(collection); });
+    std::vector<geometry_msgs::msg::TransformStamped> transfroms{};
+    collection.for_each([&transfroms, &collection]<typename From, typename To>() {
+        broadcast<From, To>(transfroms, collection);
+    });
+    Node::get_instance().tf_broadcast(transfroms);
 }
 
 template <typename JointCollectionT>
 inline void broadcast_all_modified(const JointCollectionT& collection) {
-    collection.for_each_modified(
-        [&collection]<typename From, typename To>() { broadcast<From, To>(collection); });
+    std::vector<geometry_msgs::msg::TransformStamped> transfroms{};
+    collection.for_each_modified([&transfroms, &collection]<typename From, typename To>() {
+        broadcast<From, To>(transfroms, collection);
+    });
+    Node::get_instance().tf_broadcast(transfroms);
 }
 
 } // namespace rcl
